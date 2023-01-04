@@ -19,4 +19,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+/**
+ * Route untuk menjalankan proses crud
+ * Kita juga bisa menggunakan Route Resource (Route::resource('url',Controller::class))
+ */
 Route::apiResource('article',ArticleController::class);

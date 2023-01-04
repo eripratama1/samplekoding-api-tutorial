@@ -9,6 +9,8 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 
+use function PHPUnit\Framework\isEmpty;
+
 class ArticleController extends Controller
 {
     /**
@@ -18,18 +20,24 @@ class ArticleController extends Controller
      */
     public function index()
     {
+        /**
+         * Menampilkan listing dari tabel artikel
+         * Jika tabel masih kosong akan me-return response JSON dengan
+         * status HTTP_NO_CONTENT 204
+         * 
+         * Jika tidak maka akan menampilkan list artikel
+         */
         $article = Article::latest()->get();
-        if ($article) {
+        if ($article->isEmpty()) {
             return response()->json([
-                'status' => Response::HTTP_OK,
-                'message' => 'List Article',
-                'data' => $article
+                'status' => Response::HTTP_NO_CONTENT,
+                'message' => 'Belum ada postingan artikel',
             ]);
         } else {
             return response()->json([
-                'status' => Response::HTTP_NOT_FOUND,
+                'status' => Response::HTTP_OK,
                 'message' => 'List Article',
-                'error' => $article
+                'article' => $article
             ]);
         }
     }
@@ -52,35 +60,57 @@ class ArticleController extends Controller
      */
     public function store(Request $request)
     {
+        /**
+         * Proses Validasi data menggunakan facade validator
+         */
         $validator = Validator::make($request->all(), [
             'title' => 'required',
             'category_name' => 'required',
             'content' => 'required'
         ]);
 
+        /**
+         * Jika pada saat proses Validasi data ditemukan error
+         * maka akan menampilkan pesan error validasi
+         */
         if ($validator->fails()) {
             return response()->json([
                 'errors' => $validator->messages()
             ]);
         }
 
+        /**
+         * Proses input data ke table artikel
+         */
+        $article = new Article;
+
+        /**
+         * Jika memiliki inputan gambar kode dibawah akan di jalankan
+         * lalu jalankan proses simpan data.
+         * 
+         * Jika tidak memiliki inputan gambar langsung menjalankan 
+         * proses simpan data.
+         */
         if ($request->hasFile('image')) {
             $file = $request->file('image');
             $uploadFile = time() . '_' . $file->getClientOriginalName();
             $file->move('uploads/', $uploadFile);
+            $article->image = $uploadFile;
         }
 
-        $article = Article::create([
-            'title' => $request->title,
-            'category_name' => $request->category_name,
-            'content' => $request->content,
-            'image' => $uploadFile
-        ]);
+        $article->title = $request->title;
+        $article->category_name = $request->category_name;
+        $article->content = $request->content;
+        $article->save();
 
+        /**
+         * Return response yang di dapat jika proses
+         * simpan data berhasil
+         */
         return response()->json([
             'status' => Response::HTTP_OK,
             'message' => 'Stored Success',
-            'data' => $article
+            'article' => $article
         ]);
     }
 
@@ -92,16 +122,26 @@ class ArticleController extends Controller
      */
     public function show($id)
     {
-        $article = Article::findOrFail($id);
-        if (!$article) {
-            return response()->json('Data Not Found', Response::HTTP_NOT_FOUND);
+        /**
+         * Menampilkan single data dari tabel artikel
+         * Jika data ada tampilkan datanya
+         * 
+         * jika tidak tampilkan response NOT_FOUND
+         */
+        $article = Article::find($id);
+       
+        if ($article) {
+            return response()->json([
+                'status' => Response::HTTP_OK,
+                'message' => 'Data-' . $article->id,
+                'article' => $article
+            ]);
+        } else {
+            return response()->json([
+                'status' => Response::HTTP_NOT_FOUND,
+                'message' => 'Data Not Found'
+            ]);
         }
-
-        return response()->json([
-            'status' => Response::HTTP_OK,
-            'message' => 'List Data',
-            'article' => $article
-        ]);
     }
 
     /**
@@ -122,14 +162,23 @@ class ArticleController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+
     public function update(Request $request, $id)
     {
+
+        /**
+         * Proses Validasi data menggunakan facade validator
+         */
         $validator = Validator::make($request->all(), [
             'title' => 'required',
             'category_name' => 'required',
             'content' => 'required'
         ]);
 
+        /**
+         * Jika pada saat proses Validasi data ditemukan error
+         * maka akan menampilkan pesan error validasi
+         */
         if ($validator->fails()) {
             return response()->json([
                 'errors' => $validator->messages()
@@ -138,6 +187,13 @@ class ArticleController extends Controller
 
         $article = Article::findOrFail($id);
 
+        /**
+         * Jika memiliki inputan gambar lakukan proses hapus data
+         * gambar yang lama lalu simpan gambar yang baru
+         * 
+         * Jika tidak memiliki inputan gambar langsung menjalankan 
+         * proses update data.
+         */
         if ($request->hasFile('image')) {
             if (File::exists('uploads/' . $article->image)) {
                 File::delete('uploads/' . $article->image);
@@ -155,6 +211,11 @@ class ArticleController extends Controller
             'content' => $request->content,
 
         ]);
+
+         /**
+         * Return response yang di dapat jika proses
+         * update data berhasil
+         */
         return response()->json([
             'status' => Response::HTTP_OK,
             'message' => 'Update Successfull',
@@ -170,6 +231,11 @@ class ArticleController extends Controller
      */
     public function destroy($id)
     {
+        /**
+         * Cari data yang akan dihapus dan jika data tersebut
+         * memiliki file gambar hapus juga gambar tersebut lalu
+         * tampilkan responsenya.
+         */
         $article = Article::findOrFail($id);
         if (File::exists('uploads/' . $article->image)) {
             File::delete('uploads/' . $article->image);
