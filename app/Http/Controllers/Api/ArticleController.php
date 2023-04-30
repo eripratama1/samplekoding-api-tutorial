@@ -9,7 +9,6 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
 
-use function PHPUnit\Framework\isEmpty;
 
 class ArticleController extends Controller
 {
